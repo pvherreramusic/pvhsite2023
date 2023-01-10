@@ -1,22 +1,29 @@
 import handler from "../util/handler";
 import dynamoDb from "../util/dynamodb";
 
-export const main = handler(async () => {
+export const main = handler(async (event) => {
+  const data = JSON.parse(event.body);
   const params = {
     TableName: process.env.TABLE_NAME,
-    // 'KeyConditionExpression' defines the condition for the query
-    // - 'userId = :userId': only return items with matching 'userId'
-    //   partition key
-    KeyConditionExpression: "userId = :userId",
-    // 'ExpressionAttributeValues' defines the value in the condition
-    // - ':userId': defines 'userId' to be the id of the author
-    ExpressionAttributeValues: {
-      ":userId": "123",
+    // 'Key' defines the partition key and sort key of the item to be updated
+    Key: {
+      userId: event.requestContext.authorizer.iam.cognitoIdentity.identityId, // The id of the author
+      linkId: event.pathParameters.id, // The id of the note from the path
     },
+    // 'UpdateExpression' defines the attributes to be updated
+    // 'ExpressionAttributeValues' defines the value in the update expression
+    UpdateExpression: "SET linkurl = :linkurl",
+    ExpressionAttributeValues: {
+      ":linkurl": data.linkurl || null
+      
+    },
+    // 'ReturnValues' specifies if and how to return the item's attributes,
+    // where ALL_NEW returns all attributes of the item after the update; you
+    // can inspect 'result' below to see how it works with different settings
+    ReturnValues: "ALL_NEW",
   };
 
-  const result = await dynamoDb.query(params);
+  await dynamoDb.update(params);
 
-  // Return the matching list of items in response body
-  return result.Items;
+  return { status: true };
 });
